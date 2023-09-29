@@ -14,7 +14,7 @@ HOST = "127.0.0.1"
 PORT = 20508
 MAX_RESULT_LENGTH = 10000
 
-RATELIMIT = "30/minute"
+RATELIMIT = "60/minute"
 
 LOGFMT = "[%(filename)s][%(asctime)s][%(levelname)s] %(message)s"
 LOGDATEFMT = "%Y/%m/%d-%H:%M:%S"
@@ -46,7 +46,8 @@ async def post_eval(request: web.Request) -> web.Response:
 
   try:
     expr: str = await request.text()
-    logging.info("got request from %s: %s", request.remote, expr)
+    client_ip = request.headers.get("X-Forwarded-For","UNK?")
+    logging.info("got request from %s: %s", client_ip, expr)
     result = await loop.run_in_executor(None, calculate, expr)
     try:
       str(result)
@@ -59,4 +60,9 @@ async def post_eval(request: web.Request) -> web.Response:
   
 app = web.Application()
 app.add_routes(routes)
-web.run_app(app,host=HOST,port=PORT)
+web.run_app(
+  app,
+  host=HOST,
+  port=PORT,
+  access_log=None
+)
