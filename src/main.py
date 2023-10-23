@@ -1,7 +1,13 @@
-import sys
+from __future__ import annotations
+
 import asyncio
 import logging
+import sys
+import string
+import random
+import time
 from typing import TYPE_CHECKING
+from multiprocessing import Process, Queue
 
 import py_expression_eval
 from aiohttp import web
@@ -39,6 +45,21 @@ def calculate(expr: str) -> float:
   result: float = expression.evaluate({})
   return result
 
+def super_calculate(expr: str) -> float:
+  queue = Queue()
+
+  def _inner():
+    queue.put(calculate(expr))
+
+  p = Process(target=_inner)
+  p.start()
+  p.join()
+  return queue.get()
+
+@routes.get("/")
+async def get_root(request: web.Request) -> web.Response:
+  raise web.HTTPFound("https://github.com/SkyTheCodeMaster/math-microservice")
+
 @routes.post("/eval")
 @limiter.limit(RATELIMIT)
 async def post_eval(request: web.Request) -> web.Response:
@@ -48,7 +69,7 @@ async def post_eval(request: web.Request) -> web.Response:
     expr: str = await request.text()
     client_ip = request.headers.get("X-Forwarded-For","UNK?")
     logging.info("got request from %s: %s", client_ip, expr)
-    result = await loop.run_in_executor(None, calculate, expr)
+    result = await asyncio.to_thread(super_calculate, expr)
     try:
       str(result)
     except ValueError:
